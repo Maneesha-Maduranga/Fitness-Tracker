@@ -5,7 +5,9 @@ import { GoalModule } from './goal/goal.module';
 
 
 
+
 import { ConfigModule } from '@nestjs/config';
+import { PrismaModule } from './prisma/prisma.module';
 
 
 
@@ -15,7 +17,8 @@ import { ConfigModule } from '@nestjs/config';
     AuthModule, 
     GoalModule,
     ConfigModule.forRoot(),
-  ],
+    PrismaModule,
+    ],
   controllers: [],
   providers: [],
 })
