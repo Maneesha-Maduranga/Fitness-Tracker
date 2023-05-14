@@ -1,8 +1,7 @@
-import {
-  Injectable,
-  HttpStatus,
-  HttpException,
-} from '@nestjs/common';
+import { Injectable, HttpStatus, Res, HttpException,UseGuards,Request } from '@nestjs/common';
+
+import {  Response } from 'express';
+
 import { RegisterUserDto } from './dto/register.dto';
 
 import * as bcrypt from 'bcrypt';
@@ -12,6 +11,7 @@ import { LoginUserDto } from './dto/login.dto';
 
 import { JwtService } from '@nestjs/jwt';
 
+
 //Hash The Password
 const hashPassword = async (password: string) => {
   const saltOrRounds = 10;
@@ -20,21 +20,14 @@ const hashPassword = async (password: string) => {
 };
 
 //Compare the Password
-const comparePassword = async (password:string,hash:string) => {
+const comparePassword = async (password: string, hash: string) => {
   const isMatch = await bcrypt.compare(password, hash);
-  return isMatch
-}
-
+  return isMatch;
+};
 
 @Injectable()
 export class AuthService {
-  constructor(
-    private prisma: PrismaService,
-    private jwtService: JwtService
-  ) {}
-  
-  
-
+  constructor(private prisma: PrismaService, private jwtService: JwtService) {}
 
   async register(userData: RegisterUserDto) {
     try {
@@ -49,18 +42,16 @@ export class AuthService {
       });
 
       //Create PayLoad
-      const payload = { username: user.username, sub: user.id };
-
+      const payload = { username: user.username, id: user.id };
 
       delete user.password;
 
-
-     let  access_token =  await this.jwtService.sign(payload)
+      let access_token = await this.jwtService.sign(payload);
 
       return {
         sucess: true,
         data: { user },
-        access_token
+        access_token,
       };
     } catch (error) {
       if (error.code == 'P2002') {
@@ -72,42 +63,51 @@ export class AuthService {
     }
   }
 
-
-  async login(userData:LoginUserDto) {
+  async login(@Res() res: Response, userData: LoginUserDto) {
     //Check If User In the DataBase
     let user = await this.prisma.user.findUnique({
-      where:{
-        email:userData.email
-      }
-    })
+      where: {
+        email: userData.email,
+      },
+    });
 
-    if(!user){
-      throw new HttpException("No User With Given Credential",HttpStatus.NOT_FOUND)
+    if (!user) {
+      throw new HttpException(
+        'No User With Given Credential',
+        HttpStatus.NOT_FOUND,
+      );
     }
 
     //Compare Password
-    let matched = await comparePassword(userData.password,user.password)
-    
-    if(!matched){
-      throw new HttpException("Password Incorrect",HttpStatus.BAD_REQUEST)
+    let matched = await comparePassword(userData.password, user.password);
+
+    if (!matched) {
+      throw new HttpException('Password Incorrect', HttpStatus.BAD_REQUEST);
     }
 
-    delete user.password
+    delete user.password;
 
-     //Create PayLoad
-    const payload = { username: user.username, sub: user.id };
+    //Create PayLoad
+    const payload = { username: user.username, id: user.id };
 
-    let access_token = await this.jwtService.sign(payload)
+    let access_token = await this.jwtService.sign(payload);
 
-     return {
-      sucess: true,
-      data: { user },
-      access_token: access_token
-    };
-   
-    
-
+    res
+      .cookie('access_token', access_token, {
+        httpOnly: true,
+        expires: new Date(Date.now() + 1 * 24 * 60 * 1000),
+      })
+      .status(HttpStatus.OK)
+      .json({ sucess: true, data: { user }, access_token: access_token });
   }
+  
+  
+  me(req){
+    return req.user
+  }
+ 
+
+  
   logout() {
     return 'User Logout';
   }
